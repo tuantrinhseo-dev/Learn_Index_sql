@@ -39,11 +39,12 @@ export interface DatabaseState {
 }
 
 export interface QueryResult {
-  data: any[];
+  data?: any[];
   executionTimeMs: number;
-  rowsScanned: number;
-  usedIndex: boolean;
+  rowsScanned?: number;
+  usedIndex?: boolean;
   explanation: string;
+  success?: boolean;
 }
 
 export interface Lesson {

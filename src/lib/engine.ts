@@ -37,6 +37,70 @@ export class SQLSimulator {
   }
 
   /**
+   * Parses and executes a SQL string
+   */
+  run(sql: string): QueryResult {
+    const cleanSql = sql.trim().replace(/;$/, '');
+    const startTime = performance.now();
+
+    try {
+      // 1. Handle CREATE INDEX
+      const createIndexMatch = cleanSql.match(/CREATE\s+INDEX\s+(\w+)\s+ON\s+(\w+)\s*\((\w+)\)/i);
+      if (createIndexMatch) {
+        const [, , table, column] = createIndexMatch;
+        const tableName = table.toLowerCase() as TableName;
+        if (!this.state[tableName]) throw new Error(`Bảng '${table}' không tồn tại.`);
+        this.addIndex(tableName, column.toLowerCase());
+        return {
+          executionTimeMs: performance.now() - startTime,
+          explanation: `Đã tạo chỉ mục (index) thành công trên ${table}(${column}).`,
+          success: true
+        };
+      }
+
+      // 2. Handle DROP INDEX (simplified)
+      const dropIndexMatch = cleanSql.match(/DROP\s+INDEX\s+(\w+)\s+ON\s+(\w+)\s*\((\w+)\)/i);
+      if (dropIndexMatch) {
+        const [, , table, column] = dropIndexMatch;
+        const tableName = table.toLowerCase() as TableName;
+        this.removeIndex(tableName, column.toLowerCase());
+        return {
+          executionTimeMs: performance.now() - startTime,
+          explanation: `Đã xóa chỉ mục thành công trên ${table}(${column}).`,
+          success: true
+        };
+      }
+
+      // 3. Handle SELECT (Simplified)
+      // SELECT * FROM table WHERE column = 'value'
+      const selectMatch = cleanSql.match(/SELECT\s+\*\s+FROM\s+(\w+)\s+WHERE\s+(\w+)\s*(=|>|<|LIKE)\s*(.+)/i);
+      if (selectMatch) {
+        const [, table, column, operator, rawValue] = selectMatch;
+        const tableName = table.toLowerCase() as TableName;
+        if (!this.state[tableName]) throw new Error(`Bảng '${table}' không tồn tại.`);
+
+        let value = rawValue.trim();
+        if (value.startsWith("'") && value.endsWith("'")) {
+          value = value.slice(1, -1);
+        } else if (!isNaN(Number(value))) {
+          value = Number(value);
+        }
+
+        return this.executeQuery(tableName, column.toLowerCase(), value, operator.toUpperCase() as any);
+      }
+
+      throw new Error("Câu lệnh SQL không hợp lệ hoặc không được hỗ trợ trong phiên bản giả lập này.");
+
+    } catch (error: any) {
+      return {
+        executionTimeMs: performance.now() - startTime,
+        explanation: `Lỗi SQL: ${error.message}`,
+        success: false
+      };
+    }
+  }
+
+  /**
    * Simulates a SELECT * FROM table WHERE column = value
    */
   executeQuery(tableName: TableName, column: string, value: any, operator: '=' | '>' | '<' | 'LIKE' = '='): QueryResult {

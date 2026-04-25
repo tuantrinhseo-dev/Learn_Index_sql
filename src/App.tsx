@@ -44,8 +44,16 @@ export default function App() {
 
   // Lab State
   const [labTable, setLabTable] = useState<'users' | 'products' | 'orders'>('users');
-  const [labValue, setLabValue] = useState('user_500@example.com');
+  const [labSQL, setLabSQL] = useState("SELECT * FROM users WHERE email = 'user_500@example.com'");
   const [labResult, setLabResult] = useState<QueryResult | null>(null);
+
+  useEffect(() => {
+    if (activeExercise) {
+      setLabSQL(activeExercise.initialQuery);
+    } else {
+      setLabSQL(`SELECT * FROM ${labTable} WHERE id = 500`);
+    }
+  }, [activeExercise, labTable]);
 
   useEffect(() => {
     const saved = localStorage.getItem('index_master_progress');
@@ -67,12 +75,19 @@ export default function App() {
   };
 
   const handleRunQuery = () => {
-    const col = labTable === 'users' ? 'email' : labTable === 'products' ? 'category' : 'status';
-    const result = dbSimulator.executeQuery(labTable, col, labValue);
+    const result = dbSimulator.run(labSQL);
     setLabResult(result);
 
+    // Sync UI indexes with engine state after running SQL
+    const updatedIndexes = {
+      users: dbSimulator.getIndexes('users'),
+      products: dbSimulator.getIndexes('products'),
+      orders: dbSimulator.getIndexes('orders'),
+    };
+    setUserIndexes(updatedIndexes);
+
     // If in an exercise, check winning criteria
-    if (activeExercise && result.rowsScanned <= activeExercise.winningCriteria.maxRowsScanned) {
+    if (activeExercise && result.success !== false && result.rowsScanned !== undefined && result.rowsScanned <= activeExercise.winningCriteria.maxRowsScanned) {
       if (!completedExercises.includes(activeExercise.id)) {
         saveProgress([...completedExercises, activeExercise.id]);
       }
@@ -270,20 +285,17 @@ export default function App() {
                       </select>
                     </div>
 
-                    <div className="p-6 font-mono text-lg bg-slate-900/50 min-h-[160px] relative group">
-                      <div className="flex flex-wrap gap-2 items-center text-indigo-400">
-                        <span className="text-slate-500">SELECT</span> * <span className="text-slate-500">FROM</span> {activeExercise?.targetTable || labTable} <span className="text-slate-500 whitespace-nowrap">WHERE cột =</span> 
-                        <input 
-                          type="text"
-                          value={labValue}
-                          onChange={(e) => setLabValue(e.target.value)}
-                          className="bg-slate-800 border-none rounded px-2 py-1 text-white focus:ring-1 focus:ring-indigo-500/50 w-full md:w-auto mt-2 md:mt-0"
-                          placeholder="giá_trị_tìm_kiếm"
-                        />
-                      </div>
+                    <div className="p-0 font-mono text-lg bg-slate-900/50 min-h-[160px] relative group">
+                      <textarea 
+                        value={labSQL}
+                        onChange={(e) => setLabSQL(e.target.value)}
+                        spellCheck={false}
+                        className="w-full h-full min-h-[160px] p-6 bg-transparent border-none text-indigo-400 focus:ring-0 resize-none font-mono text-base leading-relaxed"
+                        placeholder="Nhập câu lệnh SQL tại đây... (VD: SELECT * FROM users WHERE email = '...')"
+                      />
                       <button 
                         onClick={handleRunQuery}
-                        className="absolute bottom-4 right-4 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 transition-all font-bold text-sm"
+                        className="absolute bottom-4 right-4 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 transition-all font-bold text-sm z-10"
                       >
                         <Play size={16} fill="currentColor" /> CHẠY TRUY VẤN
                       </button>
